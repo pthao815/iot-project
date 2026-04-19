@@ -8,6 +8,8 @@ export function useDeviceActions(params: {
   action?: string;
   status?: string;
   search?: string;
+  sort_key?: string;
+  sort_dir?: string;
 }) {
   return useQuery({
     queryKey: ['device-actions', params],

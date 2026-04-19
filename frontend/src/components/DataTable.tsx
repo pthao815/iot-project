@@ -1,29 +1,53 @@
 import { useState, type ReactNode } from 'react';
-import { Search, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Filter, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { MickeyIcon } from './MickeyIcon';
 
 export interface Column {
-  key:     string;
-  label:   string;
-  render?: (value: unknown, row: Record<string, unknown>) => ReactNode;
+  key:       string;
+  label:     string;
+  sortable?: boolean;
+  render?:   (value: unknown, row: Record<string, unknown>) => ReactNode;
 }
 
 interface DataTableProps {
-  title:        string;
-  data:         Record<string, unknown>[];
-  columns:      Column[];
-  total:        number;
-  page:         number;
-  totalPages:   number;
-  onPageChange: (page: number) => void;
-  onSearch:     (search: string) => void;
-  filters?:     ReactNode;
-  isLoading?:   boolean;
+  title:              string;
+  data:               Record<string, unknown>[];
+  columns:            Column[];
+  total:              number;
+  page:               number;
+  totalPages:         number;
+  onPageChange:       (page: number) => void;
+  onSearch:           (search: string) => void;
+  filters?:           ReactNode;
+  isLoading?:         boolean;
+  // Sort
+  sortKey?:           string;
+  sortDir?:           'asc' | 'desc';
+  onSort?:            (key: string) => void;
+  // Page size
+  pageSize?:          number;
+  onPageSizeChange?:  (size: number) => void;
+}
+
+function SortIcon({ colKey, sortKey, sortDir }: {
+  colKey: string;
+  sortKey?: string;
+  sortDir?: 'asc' | 'desc';
+}) {
+  if (colKey !== sortKey) {
+    return <ArrowUpDown size={11} className="text-pink-200 ml-1 inline-block" />;
+  }
+  if (sortDir === 'asc') {
+    return <ArrowUp size={11} className="text-pink-500 ml-1 inline-block" />;
+  }
+  return <ArrowDown size={11} className="text-pink-500 ml-1 inline-block" />;
 }
 
 export function DataTable({
   title, data, columns, total, page, totalPages,
   onPageChange, onSearch, filters, isLoading,
+  sortKey, sortDir, onSort,
+  pageSize, onPageSizeChange,
 }: DataTableProps) {
   const [search, setSearch] = useState('');
 
@@ -51,9 +75,9 @@ export function DataTable({
             />
             <input
               type="text"
-              placeholder="Tìm kiếm..."
+              placeholder="Tìm kiếm... (vd: 17:15:48 12/4/2026)"
               value={search}
-              className="pl-11 pr-6 py-2.5 bg-pink-50/50 border-none rounded-2xl text-sm focus:ring-4 focus:ring-pink-100 outline-none w-full md:w-64"
+              className="pl-11 pr-6 py-2.5 bg-pink-50/50 border-none rounded-2xl text-sm focus:ring-4 focus:ring-pink-100 outline-none w-full md:w-72"
               onChange={e => handleSearch(e.target.value)}
             />
           </div>
@@ -83,7 +107,17 @@ export function DataTable({
                     key={col.key}
                     className="p-5 text-[10px] font-black text-pink-300 uppercase tracking-widest"
                   >
-                    {col.label}
+                    {col.sortable && onSort ? (
+                      <button
+                        onClick={() => onSort(col.key)}
+                        className="flex items-center gap-0.5 hover:text-pink-500 transition-colors"
+                      >
+                        {col.label}
+                        <SortIcon colKey={col.key} sortKey={sortKey} sortDir={sortDir} />
+                      </button>
+                    ) : (
+                      col.label
+                    )}
                   </th>
                 ))}
               </tr>
@@ -117,9 +151,22 @@ export function DataTable({
 
       {/* Footer / Pagination */}
       <div className="p-6 bg-pink-50/20 border-t border-pink-50 flex justify-between items-center shrink-0">
-        <span className="text-[10px] font-bold text-pink-400 uppercase">
-          Trang {page} / {totalPages || 1}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] font-bold text-pink-400 uppercase">
+            Trang {page} / {totalPages || 1}
+          </span>
+          {onPageSizeChange && (
+            <select
+              value={pageSize ?? 10}
+              onChange={e => onPageSizeChange(Number(e.target.value))}
+              className="text-[10px] font-bold text-pink-400 bg-white border border-pink-100 rounded-xl px-2 py-1 outline-none cursor-pointer hover:bg-pink-50 uppercase"
+            >
+              <option value={10}>10 / trang</option>
+              <option value={20}>20 / trang</option>
+              <option value={50}>50 / trang</option>
+            </select>
+          )}
+        </div>
         <div className="flex gap-2">
           <button
             onClick={() => onPageChange(page - 1)}

@@ -4,13 +4,14 @@ import { MickeyIcon } from './MickeyIcon';
 type Color = 'cyan' | 'pink' | 'amber';
 
 interface DeviceCardProps {
-  name:       string;
-  sub:        string;
-  icon:       LucideIcon;
-  isOn:       boolean;
-  onToggle:   () => void;
-  color:      Color;
-  isPending?: boolean;
+  name:         string;
+  sub:          string;
+  icon:         LucideIcon;
+  isOn:         boolean;   // toggle color: original state during pending, db state otherwise
+  onToggle:     () => void;
+  color:        Color;
+  isPending?:   boolean;   // blocks clicks + cursor-wait
+  showSpinner?: boolean;   // replaces knob with spinner inside toggle
 }
 
 const toggleColors: Record<Color, string> = {
@@ -26,13 +27,13 @@ const iconColors: Record<Color, string> = {
 };
 
 export function DeviceCard({
-  name, sub, icon: Icon, isOn, onToggle, color, isPending,
+  name, sub, icon: Icon, isOn, onToggle, color, isPending, showSpinner,
 }: DeviceCardProps) {
   return (
     <div
       onClick={isPending ? undefined : onToggle}
       className={`relative rounded-[2.5rem] p-5 border transition-all duration-500 overflow-hidden group glass-panel border-white shadow-lg ${
-        isPending ? 'cursor-wait opacity-75' : 'cursor-pointer hover:-translate-y-1'
+        isPending ? 'cursor-wait opacity-80' : 'cursor-pointer hover:-translate-y-1'
       }`}
     >
       <div className="flex flex-col justify-between h-full gap-5">
@@ -46,13 +47,13 @@ export function DeviceCard({
             <Icon size={24} strokeWidth={2.5} />
           </div>
 
-          {/* Toggle switch */}
+          {/* Toggle: color = original state, knob replaced by spinner while pending */}
           <div
             className={`w-12 h-7 rounded-full p-1 transition-colors duration-300 relative ${
               isOn ? toggleColors[color] : 'bg-slate-200'
             }`}
           >
-            {isPending ? (
+            {showSpinner ? (
               <div className="absolute inset-0 flex items-center justify-center">
                 <Loader2 size={16} className="text-white animate-spin" />
               </div>

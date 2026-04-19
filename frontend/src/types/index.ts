@@ -16,17 +16,18 @@ export interface SensorData {
 }
 
 export interface Device {
-  device_id:      number;
-  device_name:    string;
-  current_status: 'ON' | 'OFF';
-  created_at:     string;
+  device_id:         number;
+  device_name:       string;
+  current_status:    'ON' | 'OFF';
+  created_at:        string;
+  pending_action_id: number | null;
 }
 
 export interface DeviceAction {
   action_id:   number;
   device_id:   number;
   action:      'ON' | 'OFF';
-  status:      string;
+  status:      'PENDING' | 'SUCCESS' | 'FAILED';
   action_time: string;
   device_name: string;
 }

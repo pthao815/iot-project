@@ -7,11 +7,25 @@ import { formatDateTime, formatValue } from '../lib/utils';
 
 export function SensorDataPage() {
   const [page,     setPage]     = useState(1);
+  const [limit,    setLimit]    = useState(10);
   const [search,   setSearch]   = useState('');
   const [sensorId, setSensorId] = useState<number | undefined>();
+  const [sortKey,  setSortKey]  = useState('recorded_at');
+  const [sortDir,  setSortDir]  = useState<'asc' | 'desc'>('desc');
+
+  function handleSort(key: string) {
+    if (key === sortKey) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+    setPage(1);
+  }
 
   const { data, isLoading } = useSensorDataList({
-    page, limit: 10, sensor_id: sensorId, search,
+    page, limit, sensor_id: sensorId, search,
+    sort_key: sortKey, sort_dir: sortDir,
   });
 
   const { data: sensors = [] } = useQuery({
@@ -20,16 +34,17 @@ export function SensorDataPage() {
   });
 
   const columns: Column[] = [
-    { key: 'data_id',     label: 'ID' },
+    { key: 'data_id',     label: 'ID',          sortable: true },
     { key: 'sensor_name', label: 'Tên cảm biến' },
     {
       key: 'value',
       label: 'Giá trị',
+      sortable: true,
       render: (_, row) => {
         const type = String(row['sensor_type'] ?? '').toLowerCase();
         const colorClass =
-          type.includes('temp')  ? 'bg-red-50 text-red-500'     :
-          type.includes('hum')   ? 'bg-blue-50 text-blue-500'   :
+          type.includes('temp')  ? 'bg-red-50 text-red-500'       :
+          type.includes('hum')   ? 'bg-blue-50 text-blue-500'     :
           type.includes('light') ? 'bg-yellow-50 text-yellow-600' :
           'bg-slate-50 text-slate-500';
         const val  = Number(row['value']);
@@ -44,6 +59,7 @@ export function SensorDataPage() {
     {
       key: 'recorded_at',
       label: 'Thời gian',
+      sortable: true,
       render: (v) => formatDateTime(String(v)),
     },
   ];
@@ -76,6 +92,11 @@ export function SensorDataPage() {
       onSearch={v => { setSearch(v); setPage(1); }}
       filters={filters}
       isLoading={isLoading}
+      sortKey={sortKey}
+      sortDir={sortDir}
+      onSort={handleSort}
+      pageSize={limit}
+      onPageSizeChange={(s) => { setLimit(s); setPage(1); }}
     />
   );
 }

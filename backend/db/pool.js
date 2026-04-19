@@ -9,7 +9,8 @@ const pool = mysql.createPool({
   database:         process.env.DB_NAME || 'iot',
   waitForConnections: true,
   connectionLimit:  10,
-  queueLimit:       0,
+  queueLimit:       50,      // fail with error instead of queuing forever
+  connectTimeout:   10000,   // 10s — don't hang on dead MySQL
 });
 
 module.exports = pool;

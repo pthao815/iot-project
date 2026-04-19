@@ -28,6 +28,8 @@ export const fetchSensorData = (params?: {
   limit?: number;
   sensor_id?: number;
   search?: string;
+  sort_key?: string;
+  sort_dir?: string;
 }) =>
   api
     .get<PaginatedResponse<SensorData>>('/sensor-data', { params })
@@ -38,7 +40,17 @@ export const fetchDevices = () =>
   api.get<Device[]>('/devices').then(r => r.data);
 
 export const postDeviceAction = (deviceId: number, action: 'ON' | 'OFF') =>
-  api.post(`/devices/${deviceId}/action`, { action }).then(r => r.data);
+  api.post<{ action_id: number; mqtt_published: boolean; device: { device_id: number; device_name: string; current_status: string } }>(
+    `/devices/${deviceId}/action`, { action }
+  ).then(r => r.data);
+
+export const fetchDeviceAction = (actionId: number) =>
+  api.get<{ action_id: number; status: string; device_id: number; action: string }>(
+    `/device-actions/${actionId}`
+  ).then(r => r.data);
+
+export const patchDeviceAction = (actionId: number, status: 'success' | 'failed') =>
+  api.patch(`/device-actions/${actionId}`, { status }).then(r => r.data);
 
 /* ── Device actions (history) ── */
 export const fetchDeviceActions = (params?: {
@@ -48,6 +60,8 @@ export const fetchDeviceActions = (params?: {
   action?: string;
   status?: string;
   search?: string;
+  sort_key?: string;
+  sort_dir?: string;
 }) =>
   api
     .get<PaginatedResponse<DeviceAction>>('/device-actions', { params })

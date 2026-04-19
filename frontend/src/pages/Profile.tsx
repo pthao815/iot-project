@@ -1,11 +1,11 @@
 import { FileText, Github, Code, Figma } from 'lucide-react';
 import { MickeyIcon } from '../components/MickeyIcon';
+import avatarImg from '../assets/IMG_4789_Original.jpg';
 
 const INFO_ITEMS = [
-  { label: 'Mã sinh viên', value: 'B21DCCN001' },
-  { label: 'Ngày sinh',    value: '01/01/2003'  },
-  { label: 'Quê quán',     value: 'Hà Nội'      },
-  { label: 'Sở thích',     value: 'IoT & Web'   },
+  { label: 'Môn học', value: 'Phát triển ứng dụng IOT' },
+  { label: 'Lớp',    value: 'D22PTDPT1'  },
+  
 ];
 
 const SOCIAL_ITEMS = [
@@ -30,7 +30,7 @@ export function Profile() {
             <div className="w-48 h-48 rounded-full p-2 bg-gradient-to-tr from-pink-400 to-rose-400 shadow-2xl group-hover:rotate-12 transition-transform duration-500">
               <div className="w-full h-full rounded-full overflow-hidden bg-white border-4 border-white">
                 <img
-                  src="https://api.dicebear.com/7.x/notionists/svg?seed=Mickey&backgroundColor=fce7f3"
+                  src={avatarImg}
                   alt="Avatar"
                   className="w-full h-full object-cover"
                 />
@@ -47,7 +47,7 @@ export function Profile() {
               Phương Thảo
             </h2>
             <p className="text-pink-500 font-bold text-lg mb-8 tracking-widest uppercase">
-              Sinh viên IoT
+              MSV: B21DCPT212
             </p>
 
             <div className="grid grid-cols-2 gap-4 mb-10">

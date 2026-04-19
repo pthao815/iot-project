@@ -10,7 +10,8 @@ export function formatDateTime(dt: string): string {
 }
 
 export function formatValue(value: number, unit: string): string {
-  // Pad unit with a space only when it's a word unit (e.g. "Lux"), not a symbol
+  // Round to 1 decimal place to match hardware precision (avoids float noise like 25.500000953)
+  const rounded    = Math.round(value * 10) / 10;
   const needsSpace = unit && /^[A-Za-z]/.test(unit);
-  return `${value}${needsSpace ? ' ' : ''}${unit}`;
+  return `${rounded}${needsSpace ? ' ' : ''}${unit}`;
 }

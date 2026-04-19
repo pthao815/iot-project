@@ -10,14 +10,8 @@ export function useDevices() {
 }
 
 export function useDeviceAction() {
-  const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ deviceId, action }: { deviceId: number; action: 'ON' | 'OFF' }) =>
       postDeviceAction(deviceId, action),
-    onSuccess: () => {
-      // Refresh both devices list and history after every toggle
-      qc.invalidateQueries({ queryKey: ['devices'] });
-      qc.invalidateQueries({ queryKey: ['device-actions'] });
-    },
   });
 }

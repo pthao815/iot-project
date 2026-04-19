@@ -1,7 +1,9 @@
 const express = require('express');
 const router  = express.Router();
-const { getAll } = require('../controllers/deviceActionsController');
+const { getAll, getOne, patchStatus } = require('../controllers/deviceActionsController');
 
-router.get('/', getAll);
+router.get('/',    getAll);
+router.get('/:id', getOne);
+router.patch('/:id', patchStatus);
 
 module.exports = router;

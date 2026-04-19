@@ -35,7 +35,7 @@ async function getChart(req, res, next) {
     }
 
     const [rows] = await pool.query(
-      `SELECT sd.recorded_at AS time, sd.value, s.sensor_name, s.sensor_type, s.unit
+      `SELECT sd.recorded_at, sd.value, s.sensor_name, s.sensor_type, s.unit
        FROM sensor_data sd
        JOIN sensors s ON sd.sensor_id = s.sensor_id
        WHERE ${where}
@@ -51,7 +51,7 @@ async function getChart(req, res, next) {
   }
 }
 
-// GET /api/sensor-data — paginated list with optional filters
+// GET /api/sensor-data — paginated list with optional filters + sort
 async function getAll(req, res, next) {
   try {
     const page     = Math.max(1, parseInt(req.query.page)  || 1);
@@ -59,6 +59,15 @@ async function getAll(req, res, next) {
     const offset   = (page - 1) * limit;
     const sensorId = req.query.sensor_id ? parseInt(req.query.sensor_id) : null;
     const search   = req.query.search ? `%${req.query.search}%` : null;
+
+    // Sort — whitelist to prevent SQL injection
+    const sortMap = {
+      data_id:     'sd.data_id',
+      value:       'sd.value',
+      recorded_at: 'sd.recorded_at',
+    };
+    const sortCol = sortMap[req.query.sort_key] || 'sd.recorded_at';
+    const sortDir = req.query.sort_dir === 'asc' ? 'ASC' : 'DESC';
 
     const params = [];
     let where = '1=1';
@@ -68,8 +77,14 @@ async function getAll(req, res, next) {
       params.push(sensorId);
     }
     if (search) {
-      where += ' AND (s.sensor_name LIKE ? OR s.sensor_type LIKE ? OR s.unit LIKE ?)';
-      params.push(search, search, search);
+      // Search sensor name/type/unit OR exact date-time in Vietnamese format (HH:mm:ss D/M/YYYY)
+      where += ` AND (
+        s.sensor_name LIKE ?
+        OR s.sensor_type LIKE ?
+        OR s.unit LIKE ?
+        OR DATE_FORMAT(sd.recorded_at, '%H:%i:%s %e/%c/%Y') LIKE ?
+      )`;
+      params.push(search, search, search, search);
     }
 
     const [rows] = await pool.query(
@@ -78,7 +93,7 @@ async function getAll(req, res, next) {
        FROM sensor_data sd
        JOIN sensors s ON sd.sensor_id = s.sensor_id
        WHERE ${where}
-       ORDER BY sd.recorded_at DESC
+       ORDER BY ${sortCol} ${sortDir}
        LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );

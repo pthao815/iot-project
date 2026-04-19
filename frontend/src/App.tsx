@@ -6,8 +6,9 @@ import { SensorDataPage }    from './pages/SensorData';
 import { DeviceHistoryPage } from './pages/DeviceHistory';
 import { Profile }           from './pages/Profile';
 
+
 const PAGE_TITLES: Record<Tab, string> = {
-  dashboard:  'Bảng điều khiển',
+  dashboard:  'Dashboard',
   datasensor: 'Dữ liệu cảm biến',
   history:    'Lịch sử thiết bị',
   profile:    'Trang cá nhân',

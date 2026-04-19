@@ -26,6 +26,8 @@ export function useSensorDataList(params: {
   limit: number;
   sensor_id?: number;
   search?: string;
+  sort_key?: string;
+  sort_dir?: string;
 }) {
   return useQuery({
     queryKey: ['sensor-data', 'list', params],
