@@ -120,14 +120,12 @@ const handleToggle = useCallback((deviceId: number, currentStatus: 'ON' | 'OFF')
 
   clearPending(deviceId);
 
-  // reset override
   setDisplayOverrides(prev => {
     const n = new Map(prev);
     n.delete(deviceId);
     return n;
   });
 
-  // set pending với trạng thái gốc
   setPendingMap(prev =>
     new Map(prev).set(deviceId, { originalIsOn: currentStatus === 'ON' })
   );
@@ -137,15 +135,14 @@ const handleToggle = useCallback((deviceId: number, currentStatus: 'ON' | 'OFF')
   const timer = setTimeout(() => {
     if (!mountedRef.current) return;
 
-    // ❗ stop pending
     clearPending(deviceId);
 
-    // ❗ force UI về trạng thái ban đầu
     setDisplayOverrides(prev =>
       new Map(prev).set(deviceId, currentStatus === 'ON')
     );
 
     if (actionId != null) {
+      // ✅ update history ngay
       qc.setQueriesData(
         { queryKey: ['device-actions'] },
         (old: any) => {
@@ -159,6 +156,7 @@ const handleToggle = useCallback((deviceId: number, currentStatus: 'ON' | 'OFF')
         }
       );
 
+      // ✅ update DB
       patchDeviceAction(actionId, 'failed').catch(() => {});
     }
 
@@ -175,8 +173,26 @@ const handleToggle = useCallback((deviceId: number, currentStatus: 'ON' | 'OFF')
       onSuccess: (data) => {
         const res = data as { action_id: number; mqtt_published: boolean };
 
+        // 🔥 MQTT OFFLINE
         if (!res.mqtt_published) {
           clearPending(deviceId);
+
+          // ✅ FAILED ngay trên UI
+          qc.setQueriesData(
+            { queryKey: ['device-actions'] },
+            (old: any) => {
+              if (!old?.data) return old;
+              return {
+                ...old,
+                data: old.data.map((a: any) =>
+                  a.action_id === res.action_id ? { ...a, status: 'FAILED' } : a
+                ),
+              };
+            }
+          );
+
+          // ✅ update DB
+          patchDeviceAction(res.action_id, 'failed').catch(() => {});
 
           setDisplayOverrides(prev =>
             new Map(prev).set(deviceId, currentStatus === 'ON')
@@ -190,6 +206,7 @@ const handleToggle = useCallback((deviceId: number, currentStatus: 'ON' | 'OFF')
 
         actionId = res.action_id;
       },
+
       onError: () => {
         clearPending(deviceId);
 
