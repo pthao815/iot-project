@@ -79,6 +79,25 @@ export function Dashboard() {
       qc.invalidateQueries({ queryKey: ['device-actions'] });
     }
   }, [devices, qc]);
+  useEffect(() => {
+  setDisplayOverrides(prev => {
+    const next = new Map(prev);
+
+    devices.forEach(device => {
+      const override = prev.get(device.device_id);
+      if (override === undefined) return;
+
+      const dbState = device.current_status === 'ON';
+
+      // ✅ CHỈ xóa override khi DB đã khớp
+      if (dbState === override) {
+        next.delete(device.device_id);
+      }
+    });
+
+    return next;
+  });
+}, [devices]);
 
   const clearPending = useCallback((deviceId: number) => {
     const timer = timerRefs.current.get(deviceId);
@@ -96,110 +115,94 @@ export function Dashboard() {
     qc.invalidateQueries({ queryKey: ['device-actions'] });
   }, [clearPending, qc]));
 
-  const handleToggle = useCallback((deviceId: number, currentStatus: 'ON' | 'OFF') => {
-    const nextAction: 'ON' | 'OFF' = currentStatus === 'ON' ? 'OFF' : 'ON';
+const handleToggle = useCallback((deviceId: number, currentStatus: 'ON' | 'OFF') => {
+  const nextAction: 'ON' | 'OFF' = currentStatus === 'ON' ? 'OFF' : 'ON';
 
+  clearPending(deviceId);
+
+  // reset override
+  setDisplayOverrides(prev => {
+    const n = new Map(prev);
+    n.delete(deviceId);
+    return n;
+  });
+
+  // set pending với trạng thái gốc
+  setPendingMap(prev =>
+    new Map(prev).set(deviceId, { originalIsOn: currentStatus === 'ON' })
+  );
+
+  let actionId: number | null = null;
+
+  const timer = setTimeout(() => {
+    if (!mountedRef.current) return;
+
+    // ❗ stop pending
     clearPending(deviceId);
-    setDisplayOverrides(prev => { const n = new Map(prev); n.delete(deviceId); return n; });
-    setPendingMap(prev => new Map(prev).set(deviceId, { originalIsOn: currentStatus === 'ON' }));
 
-    let actionId: number | null = null;
+    // ❗ force UI về trạng thái ban đầu
+    setDisplayOverrides(prev =>
+      new Map(prev).set(deviceId, currentStatus === 'ON')
+    );
 
-    // Timer starts from click — always reverts after 5s regardless of network state
-    const r = setTimeout(() => {
-      if (!mountedRef.current) return;
-      // Stop spinner, force display to original state immediately
-      clearPending(deviceId);
-      setDisplayOverrides(prev => new Map(prev).set(deviceId, currentStatus === 'ON'));
+    if (actionId != null) {
+      qc.setQueriesData(
+        { queryKey: ['device-actions'] },
+        (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: old.data.map((a: any) =>
+              a.action_id === actionId ? { ...a, status: 'FAILED' } : a
+            ),
+          };
+        }
+      );
 
-      if (actionId != null) {
-        // Immediately reflect FAILED in history table — no waiting for PATCH response
-        qc.setQueriesData<PaginatedResponse<DeviceAction>>(
-          { queryKey: ['device-actions'] },
-          (old) => {
-            if (!old?.data) return old;
-            return {
-              ...old,
-              data: old.data.map(a =>
-                a.action_id === actionId ? { ...a, status: 'FAILED' as const } : a
-              ),
-            };
-          }
+      patchDeviceAction(actionId, 'failed').catch(() => {});
+    }
+
+    qc.invalidateQueries({ queryKey: ['devices'] });
+    qc.invalidateQueries({ queryKey: ['device-actions'] });
+
+  }, REVERT_TIMEOUT_MS);
+
+  timerRefs.current.set(deviceId, timer);
+
+  doAction(
+    { deviceId, action: nextAction },
+    {
+      onSuccess: (data) => {
+        const res = data as { action_id: number; mqtt_published: boolean };
+
+        if (!res.mqtt_published) {
+          clearPending(deviceId);
+
+          setDisplayOverrides(prev =>
+            new Map(prev).set(deviceId, currentStatus === 'ON')
+          );
+
+          qc.invalidateQueries({ queryKey: ['devices'] });
+          qc.invalidateQueries({ queryKey: ['device-actions'] });
+
+          return;
+        }
+
+        actionId = res.action_id;
+      },
+      onError: () => {
+        clearPending(deviceId);
+
+        setDisplayOverrides(prev =>
+          new Map(prev).set(deviceId, currentStatus === 'ON')
         );
 
-        // Patch DB in background to persist the revert
-        patchDeviceAction(actionId, 'failed')
-          .then(async () => {
-            if (!mountedRef.current) return;
-            // Wait for cache to reflect the reverted DB state BEFORE removing the
-            // override — prevents a re-render with stale 'ON' cache between the two calls
-            await qc.invalidateQueries({ queryKey: ['devices'] });
-            if (!mountedRef.current) return;
-            setDisplayOverrides(prev => { const n = new Map(prev); n.delete(deviceId); return n; });
-            qc.invalidateQueries({ queryKey: ['device-actions'] });
-          })
-          .catch(() => {
-            // No internet: keep override (button stays at original), sync when possible
-            if (!mountedRef.current) return;
-            qc.invalidateQueries({ queryKey: ['devices'] });
-            qc.invalidateQueries({ queryKey: ['device-actions'] });
-          });
-      } else {
-        // POST never succeeded: DB unchanged, remove override and refresh
-        setDisplayOverrides(prev => { const n = new Map(prev); n.delete(deviceId); return n; });
         qc.invalidateQueries({ queryKey: ['devices'] });
         qc.invalidateQueries({ queryKey: ['device-actions'] });
-      }
-    }, REVERT_TIMEOUT_MS);
-    timerRefs.current.set(deviceId, r);
-
-    doAction(
-      { deviceId, action: nextAction },
-      {
-        onSuccess: (data) => {
-          const res = data as { action_id: number; mqtt_published: boolean };
-
-          if (!res.mqtt_published) {
-            // MQTT broker offline — backend already reverted DB and marked action FAILED.
-            // Cancel the 5s timer and clear spinner immediately.
-            qc.setQueriesData<PaginatedResponse<DeviceAction>>(
-              { queryKey: ['device-actions'] },
-              (old) => {
-                if (!old?.data) return old;
-                return {
-                  ...old,
-                  data: old.data.map(a =>
-                    a.action_id === res.action_id ? { ...a, status: 'FAILED' as const } : a
-                  ),
-                };
-              }
-            );
-            clearPending(deviceId);
-            setDisplayOverrides(prev => new Map(prev).set(deviceId, currentStatus === 'ON'));
-            qc.invalidateQueries({ queryKey: ['devices'] }).then(() => {
-              if (!mountedRef.current) return;
-              setDisplayOverrides(prev => { const n = new Map(prev); n.delete(deviceId); return n; });
-            });
-            qc.invalidateQueries({ queryKey: ['device-actions'] });
-            return;
-          }
-
-          actionId = res.action_id;
-        },
-        onError: () => {
-          // Network error — POST never reached server (or timed out), DB is unchanged.
-          // Cancel the 5s timer and revert spinner immediately instead of waiting.
-          clearPending(deviceId);
-          setDisplayOverrides(prev => new Map(prev).set(deviceId, currentStatus === 'ON'));
-          qc.invalidateQueries({ queryKey: ['devices'] }).then(() => {
-            if (!mountedRef.current) return;
-            setDisplayOverrides(prev => { const n = new Map(prev); n.delete(deviceId); return n; });
-          });
-          qc.invalidateQueries({ queryKey: ['device-actions'] });
-        },
-      }
-    );
-  }, [doAction, clearPending, qc]);
+      },
+    }
+  );
+}, [doAction, clearPending, qc]);
 
   // Format chart rows
   const chartData = chartRaw.map(d => ({
@@ -243,7 +246,7 @@ export function Dashboard() {
 
             // Priority: pending entry → local override → DB cache
             const displayIsOn = entry != null
-              ? entry.originalIsOn
+              ? entry.originalIsOn // ✅ giữ trạng thái cũ khi pending
               : override !== undefined
                 ? override
                 : device.current_status === 'ON';
